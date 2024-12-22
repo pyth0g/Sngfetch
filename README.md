@@ -6,4 +6,4 @@ Just play a song and sngfetch will recognize it and give you all the details rig
 ![Example](https://github.com/pyth0g/Sngfetch/blob/main/examples/example_0.png)
 ![Example](https://github.com/pyth0g/Sngfetch/blob/main/examples/example_1.png)
 
-![Example](https://github.com/pyth0g/Sngfetch/blob/main/examples/example.mp4)
+![Video](https://github.com/pyth0g/Sngfetch/blob/main/examples/example.mp4)
