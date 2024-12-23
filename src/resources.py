@@ -51,9 +51,14 @@ def sampleAudio(t: int, gain: int = 2) -> bytes:
 def coverArtToText(image: str, density: dict, s: int) -> Tuple[str, tuple]:
     im = Image.open(image)
 
-    dc = SpotifyBackgroundColor(np.array(im)).best_color()
+    try:
+        dc = SpotifyBackgroundColor(np.array(im)).best_color()
+    except Exception:
+        dc = (255, 255, 255)
+        
     im = im.resize((s * 2, s), Image.Resampling.LANCZOS)
     mono = im.convert('L')
+    im = im.convert('RGB')
     
     img = []
     tmp = ''
