@@ -4,6 +4,17 @@ from resources import coverArtToText
 import requests
 from typing import Callable
 import asyncio
+import argparse
+from sys import exit
+
+VERSION = '1.1'
+
+parser = argparse.ArgumentParser(description='Sngfetch: get song details in the command line.')
+parser.add_argument('-v', '--version', action='version', version=f'%(prog)s v{VERSION}')
+parser.add_argument('-hi', '--history', action='store_true', help='Show the history of fetched songs.')
+parser.add_argument('-hic', '--history-clear', action='store_true', help='Clear all the history of fetched songs.')
+parser.add_argument('-r', '--remove', help="Remove a song from the history by it's title.")
+args = parser.parse_args()
 
 # Lambda call counter
 def lambdaCounter(func: Callable):
@@ -96,6 +107,30 @@ def display(data):
     # Fill the rest of the space with empty lines
     for _ in range(width - md.count - 2):
         printNext('', w)
+
+# Get the history of fetched songs
+if args.history:
+    try:
+        data = song.History().get()
+        for each in data:
+            display(each)
+    except KeyboardInterrupt:
+        print('\nExiting...')
+    exit()
+
+elif args.remove:
+    try:
+        song.History().remove(args.remove)
+    except KeyboardInterrupt:
+        print('\nExiting...')
+    exit()
+
+elif args.history_clear:
+    try:
+        song.History().clear()
+    except KeyboardInterrupt:
+        print('\nExiting...')
+    exit()
 
 # Get the data about a song via the microphone
 try:

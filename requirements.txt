@@ -1,0 +1,9 @@
+sounddevice
+pillow
+requests
+shazamio-core/.
+shazamio
+scipy
+matplotlib
+scikit-learn
+audioop-lts

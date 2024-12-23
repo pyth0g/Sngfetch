@@ -1,7 +1,0 @@
-sounddevice
-pillow
-requests
-shazamio
-scipy
-matplotlib
-scikit-learn

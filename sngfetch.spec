@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['sngfetch.py'],
+    ['src/sngfetch.py'],
     pathex=[],
     binaries=[],
     datas=[],
