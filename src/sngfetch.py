@@ -1,12 +1,11 @@
 import song
 from io import BytesIO
 import resources
-from resources import debug
+from resources import debug, finish
 import requests
 from typing import Callable
 import asyncio
 import argparse
-from sys import exit
 import os
 from lyrics import Lyrics
 
@@ -27,8 +26,8 @@ parser.add_argument('-i', '--infinite', action='store_true', help='Keep trying u
 parser.add_argument('-s', '--size', type=int, help='The size of the cover art.', default=20)
 parser.add_argument('--debug', action='store_true', help='Debug mode.')
 parser.add_argument('-ve', '--verbosity', type=int, help='Set the verbosity level of debug (will only have affect if debug is on).', default=0)
-parser.add_argument('--disable-stdout', action='store_true', help='Disable stdout.')
-parser.add_argument('-log', '--log', action='store_true', help='Log the debug output in sngfetch.log (the exact location is displayed at the end).')
+parser.add_argument('--disable-stdout', action='store_true', help='Disable stdout and remove it from log.')
+parser.add_argument('--log', action='store_true', help='Log all the output in sngfetch_i.log in the current directory (recommended to use in conjunction with disable-stdout).')
 args = parser.parse_args()
 
 if args.debug:
@@ -42,15 +41,35 @@ else:
 debug(f'Initialized arguments.')
 debug(args, level=1)
 
+if args.log:
+    debug('Logging to file enabled.')
+    i = 0
+    debug('Finding debug log file path.')
+    while os.path.exists(os.path.join(os.getcwd(), f'sngfetch_{i}.log')):
+        i += 1
+    
+    log = os.path.join(os.getcwd(), f'sngfetch_{i}.log')
+    debug(f'Found debug log file path: {log}.')
+    resources.LOG_PATH = log
+
+    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
+        print(*values, end=end, sep=sep, file=file, flush=flush)
+        resources.LOG.append(sep.join(values))
+
+else:
+    debug('Logging to file disabled.')
+    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
+        print(*values, end=end, sep=sep, file=file, flush=flush)
+
 if args.disable_stdout:
     debug('Disabled print.')
     resources.DISABLE_STDOUT = True
-    def print(*_, end=None, sep=None): ... # Disable print
+    def db_print(*values, sep = None, end = None, file = None, flush = False): ... # Disable print
 
 
 def printNext(s: str, w: int, end: str = '\n') -> None:
     # Go as far to the left as possible then go to the right for the correct amount
-    print(f'\x1b[99999999D\x1b[{w}C{s}', end=end)
+    db_print(f'\x1b[99999999D\x1b[{w}C{s}', end=end)
 
 def color(s: str, rgb: tuple, bold: bool = True, fg: bool = True) -> str:
     r, g, b = rgb
@@ -115,11 +134,11 @@ def display(data):
     debug('Converting cover art to text.')
     cover, dc = resources.coverArtToText(BytesIO(response.content), density, cover_size)
     debug('Converted cover art to text.')
-    print(cover)
+    db_print(cover)
 
     # Get ready to print the other stuff
     # Put the cursor back up
-    print(f'\x1b[{len(cover.splitlines()) + 1}A')
+    db_print(f'\x1b[{len(cover.splitlines()) + 1}A')
 
 
     w = cover_size * 2 + 1
@@ -162,11 +181,11 @@ if args.history:
             display(each)
     except KeyboardInterrupt:
         debug('Keyboard interrupt.')
-        print('\nExiting...')
+        db_print('\nExiting...')
 
-    print(f'\n{len(data)} songs. ({resources.formatBytes(os.path.getsize(song.History().history_loc))})')
+    db_print(f'\n{len(data)} songs. ({resources.formatBytes(os.path.getsize(song.History().history_loc))})')
     debug('Displayed history successfully.')
-    exit()
+    finish()
 
 if args.remove:
     try:
@@ -174,10 +193,10 @@ if args.remove:
         song.History().remove(args.remove)
     except KeyboardInterrupt:
         debug('Keyboard interrupt.')
-        print('\nExiting...')
+        db_print('\nExiting...')
     
     debug('Song removal ran successfully.')
-    exit()
+    finish()
 
 if args.history_clear:
     try:
@@ -185,10 +204,10 @@ if args.history_clear:
         song.History().clear()
     except KeyboardInterrupt:
         debug('Keyboard interrupt.')
-        print('\nExiting...')
+        db_print('\nExiting...')
     
     debug('History cleared successfully.')
-    exit()
+    finish()
 
 # Get the data about a song via the microphone
 try:
@@ -198,16 +217,19 @@ try:
     display(data)
 except KeyboardInterrupt:
     debug('Keyboard interrupt.')
-    print('\nExiting...')
+    db_print('\nExiting...')
 
 if args.lyrics:
     try:
         debug('Getting lyrics.')
         lyrics = Lyrics.getFromTitle(f'{data["title"]} {''.join(data["artists"])}', data["title"])
         debug('Got lyrics successfully.')
-        print(lyrics[0])
-        print(f'({lyrics[1]})')
+        db_print(lyrics[0])
+        db_print(f'({lyrics[1]})')
     except KeyboardInterrupt:
         debug('Keyboard interrupt.')
-        print('\nExiting...')
-    exit()
+        db_print('\nExiting...')
+    finish()
+
+# Save logs if logging is on an exit
+finish()

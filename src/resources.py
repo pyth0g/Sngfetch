@@ -12,18 +12,19 @@ class userError:
     def __init__(self, err_msg: str):
         debug(err_msg, 'error', '\x1b[31m')
         print(err_msg)
-        sys.exit()
+        finish()
 
 DEBUG = False
 DEBUG_LEVEL = 0
 DISABLE_STDOUT = False
 LOG = []
+LOG_PATH = ''
 
-def debug(value: object, status: str | None = "info", color: str = "\x1b[0m", level: int = 0) -> None:
+def debug(value: object, status: str | None = 'info', color: str = '', level: int = 0) -> None:
     if DEBUG and level <= DEBUG_LEVEL:
         stack = inspect.stack()
-        debug_msg = f'{color}[{dt.now().strftime("%H:%M:%S")}] [{status.upper()}] [{stack[1].filename.split('/')[-1].split('\\')[-1]} -> {stack[1].function}] {value}\x1b[0m'
-        print(debug_msg)
+        debug_msg = f'[{dt.now().strftime("%H:%M:%S")}] [{status.upper()}] [{stack[1].filename.split('/')[-1].split('\\')[-1]} -> {stack[1].function}] {value}'
+        print(color + debug_msg + '\x1b[0m')
         LOG.append(debug_msg)
 
 def getIndex(index: int, itr: Iterable, fallback: Any | None = None) -> Any:
@@ -123,9 +124,18 @@ def coverArtToText(image: str, density: dict, s: int) -> Tuple[str, tuple]:
         
         img.append(tmp)
         debug(f'Converted row {y + 1} to ascii.', level=1)
-        debug(f'Converted row {y + 1}: {tmp}.', level=2)
         tmp = ''
     
     debug('Got ascii cover art from image.')
 
     return '\n'.join(img), dc
+
+def finish():
+    if LOG_PATH:
+        with open(LOG_PATH, 'w') as f:
+            f.write('\n'.join(LOG))
+    
+    if not DISABLE_STDOUT: print(f'Logs saved in {LOG_PATH}.')
+    debug(f'Logs saved in {LOG_PATH}.')
+
+    sys.exit()

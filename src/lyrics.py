@@ -1,16 +1,28 @@
 import os
 import requests
-from resources import userError, debug, DISABLE_STDOUT
-from sys import platform, exit
+from resources import userError, debug, DISABLE_STDOUT, finish, LOG_PATH
+import resources
+from sys import platform
 import subprocess
 import base64
 import urllib.parse
 import bs4
 import re
 
+if LOG_PATH:
+    debug('Logging to file enabled.')
+    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
+        print(*values, end=end, sep=sep, file=file, flush=flush)
+        resources.LOG.append(sep.join(values))
+
+else:
+    debug('Logging to file disabled.')
+    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
+        print(*values, end=end, sep=sep, file=file, flush=flush)
+
 if DISABLE_STDOUT:
     debug('Disabled print.')
-    def print(*_, end=None, sep=None): ... # Disable print
+    def db_print(*values, sep = None, end = None, file = None, flush = False): ... # Disable print
 
 class Lyrics:
     def getFromUrl(song_url: str):
@@ -65,7 +77,7 @@ class Lyrics:
         return '\n'.join(lyrics[1:-1])
 
     def getFromTitle(search_string: str, title: str = 'song'):
-        print('Fetching lyrics...\x1b[1A')
+        db_print('Fetching lyrics...\x1b[1A')
         debug(f'Fetching lyrics for {title=} with {search_string=}.')
         file_path = os.path.join(os.path.expanduser('~'), 'genius.api')
         debug(f'Checking for Genius API credentials in file: {file_path}.')
@@ -103,9 +115,9 @@ class Lyrics:
 
             else:
                 debug('Doing nothing.')
-                print('Doing nothing.')
+                db_print('Doing nothing.')
 
-            exit()
+            finish()
         
         debug(f'Authenticating with Genius API.')
         auth_url = 'https://api.genius.com/oauth/token'

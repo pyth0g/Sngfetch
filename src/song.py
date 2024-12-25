@@ -1,12 +1,24 @@
 import requests
-from resources import sampleAudio, userError, getIndex, debug, DISABLE_STDOUT
+from resources import sampleAudio, userError, getIndex, debug, DISABLE_STDOUT, LOG_PATH
+import resources
 from shazamio import Shazam
 import os
 import base64
 
+if LOG_PATH:
+    debug('Logging to file enabled.')
+    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
+        print(*values, end=end, sep=sep, file=file, flush=flush)
+        resources.LOG.append(sep.join(values))
+
+else:
+    debug('Logging to file disabled.')
+    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
+        print(*values, end=end, sep=sep, file=file, flush=flush)
+
 if DISABLE_STDOUT:
     debug('Disabled print.')
-    def print(*_, end=None, sep=None): ... # Disable print
+    def db_print(*values, sep = None, end = None, file = None, flush = False): ... # Disable print
 
 class Data:
     def __init__(self, timeout: int = 20, duration: int = 2, increase: int = 0):
@@ -25,25 +37,24 @@ class Data:
         # Loop until a match is found
         debug(f'Listening for a song with a timeout of {self.threshold * self.duration} seconds.')
         debug(f'Duration: {self.duration}, Threshold: {self.threshold}.', level=1)
-        print(f'\x1b[2K({itr}{('/' + str(self.threshold)) if not self.isinfinite else ''}) Listening...\x1b[1A\x1b[999999999D')
+        db_print(f'\x1b[2K({itr}{('/' + str(self.threshold)) if not self.isinfinite else ''}) Listening...\x1b[1A\x1b[999999999D')
         while not (r['matches']):
-            print(f'\x1b[2K({itr}{('/' + str(self.threshold)) if not self.isinfinite else ''}) Listening...\x1b[1A\x1b[999999999D')
+            db_print(f'\x1b[2K({itr}{('/' + str(self.threshold)) if not self.isinfinite else ''}) Listening...\x1b[1A\x1b[999999999D')
             if (itr == self.threshold - 1) and (not self.isinfinite):
                 debug(f'Last try, with a longer duration ({self.duration}).')
                 # Last try; with a longer duration
-                print(f'\x1b[2K({itr}/{self.threshold}) Last try...\x1b[1A\x1b[999999999D')
+                db_print(f'\x1b[2K({itr}/{self.threshold}) Last try...\x1b[1A\x1b[999999999D')
                 self.duration += 3
 
             elif (itr >= self.threshold - 4) and (not self.isinfinite):
                 debug(f'Trying harder, with a longer duration ({self.duration}).')
                 # Trying harder; with longer durations
-                print(f'\x1b[2K({itr}/{self.threshold}) Trying harder...\x1b[1A\x1b[999999999D')
+                db_print(f'\x1b[2K({itr}/{self.threshold}) Trying harder...\x1b[1A\x1b[999999999D')
                 self.duration += 1
             
             # Get the audio sample
             debug(f'Getting audio for sample of duration {self.duration}.')
             audio_bin = sampleAudio(self.duration)
-            debug(audio_bin, level=2)
 
             # Get the song data
             shazam = Shazam()
@@ -51,7 +62,6 @@ class Data:
             debug(f'Recognizing audio sample.')
             result = await shazam.recognize(audio_bin)
             debug(f'Got result.')
-            debug(result, level=2)
 
             r = result
             itr += 1
@@ -63,7 +73,6 @@ class Data:
 
         debug(f'Got a match after {itr} iterations.')
         debug('Parsing result.')
-        debug(f'Track data: {r['track']}', level=2)
 
         return self._parse(r['track'])
 
@@ -76,7 +85,6 @@ class Data:
             debug(f'Getting data from the Deezer API.')
             response = requests.get(deezer_api).json()
             debug('Got response')
-            debug(response, level=2)
         except requests.exceptions.RequestException as e:
             userError(f"An Error occurred: {e}\x1b[K")
             response = {'error': e}
@@ -117,7 +125,6 @@ class Data:
 
             debug(f'Parsing Deezer response.')
             for i in response.get('data'):
-                debug(f'{i=}', level=2)
                 debug(f'Checking if it is the correct track.', level=1)
                 if (track_data.get('subtitle').strip() in i['artist']['name']):
                     debug(f'Found a correct track.')
@@ -127,7 +134,6 @@ class Data:
         if not response.get('error', '') and response:
             debug(f'Got necessary data.')
             deezer_data = response
-            debug(f'{deezer_data=}', level=2)
 
             duration = deezer_data.get('duration')
             minutes = duration // 60
@@ -179,7 +185,6 @@ class History:
             with open(self.history_loc, 'r') as f:
                 self.tracks = list(map(lambda i: eval(base64.b64decode(i).decode('utf-8')), f.read().splitlines()))
                 debug(f'Loaded {len(self.tracks)} tracks into memory.')
-                debug(f'{self.tracks=}', level=2)
 
         else:
             debug(f'History file does not exist. Creating one.')
@@ -226,11 +231,11 @@ class History:
                 f.write('')
 
             debug(f'History cleared.')
-            print('History cleared.')
+            db_print('History cleared.')
             return
             
         debug(f'No changes were made.')
-        print('No changes were made.')
+        db_print('No changes were made.')
 
     def remove(self, title: str):
         debug(f'Trying to remove song with title {title}.')
@@ -254,12 +259,12 @@ class History:
                         f.write('\n'.join(self.tracks))
                     debug(f'Removed song from history file.')
 
-                    print(f"Removed '{i['title']}' from history.")
+                    db_print(f"Removed '{i['title']}' from history.")
                     found_any = True
                     continue
                 
                 debug(f'No changes were made.')
-                print('No changes were made.')
+                db_print('No changes were made.')
                 found_any = True
             
         if not found_any:
