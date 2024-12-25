@@ -7,3 +7,4 @@ scipy
 matplotlib
 scikit-learn
 audioop-lts
+bs4
