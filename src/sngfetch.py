@@ -1,19 +1,22 @@
 import song
 from io import BytesIO
-from resources import coverArtToText, formatBytes
+import resources
+from resources import debug
 import requests
 from typing import Callable
 import asyncio
 import argparse
 from sys import exit
 import os
+from lyrics import Lyrics
 
 # Versioning
 # Major revision (new UI, lots of new features, conceptual change, etc.), Minor revision (maybe a change to a search box, 1 feature added, collection of bug fixes), Bug fix release
-VERSION = '2.0.0'
+VERSION = '2.3.0'
 
 parser = argparse.ArgumentParser(description='Sngfetch: get song details in the command line.')
 parser.add_argument('-v', '--version', action='version', version=f'%(prog)s v{VERSION}')
+parser.add_argument('-l', '--lyrics', action='store_true', help='Display the lyrics of the song fetched.')
 parser.add_argument('-hi', '--history', action='store_true', help='Show the history of fetched songs.')
 parser.add_argument('-hic', '--history-clear', action='store_true', help='Clear all the history of fetched songs.')
 parser.add_argument('-r', '--remove', help="Remove a song from the history by it's title.")
@@ -21,14 +24,48 @@ parser.add_argument('-d', '--duration', type=int, help='The default duration of 
 parser.add_argument('-t', '--total', type=int, help='The total amount of time to listen for in seconds.', default=30)
 parser.add_argument('-inc', '--increase', type=int, help='Increase the duration of each audio sample to be taken in seconds.', default=0)
 parser.add_argument('-i', '--infinite', action='store_true', help='Keep trying until interrupted.')
+parser.add_argument('-s', '--size', type=int, help='The size of the cover art.', default=20)
+parser.add_argument('--debug', action='store_true', help='Debug mode.')
+parser.add_argument('-ve', '--verbosity', type=int, help='Set the verbosity level of debug (will only have affect if debug is on).', default=0)
+parser.add_argument('--disable-stdout', action='store_true', help='Disable stdout.')
+parser.add_argument('-log', '--log', action='store_true', help='Log the debug output in sngfetch.log (the exact location is displayed at the end).')
 args = parser.parse_args()
 
-cover_size = 20
+if args.debug:
+    resources.DEBUG = True
+    resources.DEBUG_LEVEL = args.verbosity
+
+else:
+    resources.DEBUG = False # Ensure that the debug mode is off (although it should be off already).
+    resources.DEBUG_LEVEL = 0
+
+debug(f'Initialized arguments.')
+debug(args, level=1)
+
+if args.disable_stdout:
+    debug('Disabled print.')
+    resources.DISABLE_STDOUT = True
+    def print(*_, end=None, sep=None): ... # Disable print
+
+
+def printNext(s: str, w: int, end: str = '\n') -> None:
+    # Go as far to the left as possible then go to the right for the correct amount
+    print(f'\x1b[99999999D\x1b[{w}C{s}', end=end)
+
+def color(s: str, rgb: tuple, bold: bool = True, fg: bool = True) -> str:
+    r, g, b = rgb
+
+    return f'{"\x1b[1m" if bold else ""}\x1b[{"38" if fg else "48"};2;{r};{g};{b}m{s}\x1b[0m'
+
+cover_size = args.size
 
 # Lambda call counter
 def lambdaCounter(func: Callable):
+    debug(f'Initializing lambda counter for {func.__name__}.', level=1)
     def wrapper(*args, **kwargs):
         wrapper.count += 1
+        debug(f'Count is now {wrapper.count}.', level=1)
+        debug(f'Calling {func.__name__} with {args} and {kwargs}.', level=1)
         
         return func(*args, **kwargs)
     
@@ -37,7 +74,11 @@ def lambdaCounter(func: Callable):
 
 # Display with all info available
 def display(data):
+    debug(f'Displaying data for {data["title"]} by {data["artists"]}.')
+    debug(f'Getting cover art from {data["cover"]}.')
+    debug(f'Using data: {data}', level=1)
     response = requests.get(data['cover'])
+    debug(f'Got cover art from {data["cover"]}.')
     
     density = {
             'Ñ': 255,
@@ -71,21 +112,15 @@ def display(data):
             }
 
     # Cover art
-    cover, dc = coverArtToText(BytesIO(response.content), density, cover_size)
+    debug('Converting cover art to text.')
+    cover, dc = resources.coverArtToText(BytesIO(response.content), density, cover_size)
+    debug('Converted cover art to text.')
     print(cover)
 
     # Get ready to print the other stuff
     # Put the cursor back up
     print(f'\x1b[{len(cover.splitlines()) + 1}A')
 
-    def printNext(s: str, w: int, end: str = '\n') -> None:
-        # Go as far to the left as possible then go to the right for the correct amount
-        print(f'\x1b[99999999D\x1b[{w}C{s}', end=end)
-
-    def color(s: str, rgb: tuple, bold: bool = True, fg: bool = True) -> str:
-        r, g, b = rgb
-
-        return f'{"\x1b[1m" if bold else ""}\x1b[{"38" if fg else "48"};2;{r};{g};{b}m{s}\x1b[0m'
 
     w = cover_size * 2 + 1
 
@@ -111,39 +146,68 @@ def display(data):
     md('Gain', data['gain'])
     md('Link', data['link'])
 
+
     # Fill the rest of the space with empty lines
     for _ in range(cover_size - md.count - 2):
-        printNext('', w)
+        printNext('', w)   
+
+    debug(f'Displayed {md.count} metadata lines and {cover_size - md.count - 2} empty lines.')
 
 # Get the history of fetched songs
 if args.history:
+    debug('Getting history of fetched songs.')
     try:
         data = song.History().get()
         for each in data:
             display(each)
     except KeyboardInterrupt:
+        debug('Keyboard interrupt.')
         print('\nExiting...')
 
-    print(f'\n{len(data)} songs. ({formatBytes(os.path.getsize(song.History().history_loc))})')
+    print(f'\n{len(data)} songs. ({resources.formatBytes(os.path.getsize(song.History().history_loc))})')
+    debug('Displayed history successfully.')
     exit()
 
-elif args.remove:
+if args.remove:
     try:
+        debug(f'Removing song with title {args.remove}.')
         song.History().remove(args.remove)
     except KeyboardInterrupt:
+        debug('Keyboard interrupt.')
         print('\nExiting...')
+    
+    debug('Song removal ran successfully.')
     exit()
 
-elif args.history_clear:
+if args.history_clear:
     try:
+        debug('Clearing history of fetched songs.')
         song.History().clear()
     except KeyboardInterrupt:
+        debug('Keyboard interrupt.')
         print('\nExiting...')
+    
+    debug('History cleared successfully.')
     exit()
 
 # Get the data about a song via the microphone
 try:
+    debug(f'Started fetching song data with args {(args.total, args.duration, args.increase) if not args.infinite else (-1, args.duration, args.increase)}.')
     data = asyncio.run(song.Data(args.total, args.duration, args.increase).get() if not args.infinite else song.Data(-1, args.duration, args.increase).get())
+    debug('Fetched song data successfully.')
     display(data)
 except KeyboardInterrupt:
+    debug('Keyboard interrupt.')
     print('\nExiting...')
+
+if args.lyrics:
+    try:
+        debug('Getting lyrics.')
+        lyrics = Lyrics.getFromTitle(f'{data["title"]} {''.join(data["artists"])}', data["title"])
+        debug('Got lyrics successfully.')
+        print(lyrics[0])
+        print(f'({lyrics[1]})')
+    except KeyboardInterrupt:
+        debug('Keyboard interrupt.')
+        print('\nExiting...')
+    exit()
