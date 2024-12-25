@@ -4,12 +4,32 @@ import numpy as np
 import struct
 import sounddevice as sd
 from PIL import Image
-from typing import Tuple
+from typing import Tuple, Any, Iterable
 
 class userError:
     def __init__(self, err_msg: str):
         print(err_msg)
         sys.exit()
+
+def getIndex(index: int, itr: Iterable, fallback: Any | None = None) -> Any:
+    try:
+        return itr[index]
+    except IndexError:
+        return fallback
+
+def formatBytes(size: int) -> Tuple[int, str]:
+    power = 2**10
+    n = 0
+    power_labels = {0 : 'Bytes', 1: 'KB', 2: 'MB', 3: 'GB', 4: 'TB'}
+    while size > power:
+        size /= power
+        n += 1
+    
+    try:
+        return f'{round(size, 2)} {power_labels[n]}'
+    except KeyError:
+        return f'{size} {power_labels[0]}'
+
 
 def sampleAudio(t: int, gain: int = 2) -> bytes:
     CHANNELS = 1
@@ -46,7 +66,6 @@ def sampleAudio(t: int, gain: int = 2) -> bytes:
     audio_data = header + audio_data
 
     return audio_data
-
 
 def coverArtToText(image: str, density: dict, s: int) -> Tuple[str, tuple]:
     im = Image.open(image)

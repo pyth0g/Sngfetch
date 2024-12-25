@@ -1,20 +1,29 @@
 import song
 from io import BytesIO
-from resources import coverArtToText
+from resources import coverArtToText, formatBytes
 import requests
 from typing import Callable
 import asyncio
 import argparse
 from sys import exit
+import os
 
-VERSION = '1.1'
+# Versioning
+# Major revision (new UI, lots of new features, conceptual change, etc.), Minor revision (maybe a change to a search box, 1 feature added, collection of bug fixes), Bug fix release
+VERSION = '2.0.0'
 
 parser = argparse.ArgumentParser(description='Sngfetch: get song details in the command line.')
 parser.add_argument('-v', '--version', action='version', version=f'%(prog)s v{VERSION}')
 parser.add_argument('-hi', '--history', action='store_true', help='Show the history of fetched songs.')
 parser.add_argument('-hic', '--history-clear', action='store_true', help='Clear all the history of fetched songs.')
 parser.add_argument('-r', '--remove', help="Remove a song from the history by it's title.")
+parser.add_argument('-d', '--duration', type=int, help='The default duration of each audio sample to be taken in seconds.', default=3)
+parser.add_argument('-t', '--total', type=int, help='The total amount of time to listen for in seconds.', default=30)
+parser.add_argument('-inc', '--increase', type=int, help='Increase the duration of each audio sample to be taken in seconds.', default=0)
+parser.add_argument('-i', '--infinite', action='store_true', help='Keep trying until interrupted.')
 args = parser.parse_args()
+
+cover_size = 20
 
 # Lambda call counter
 def lambdaCounter(func: Callable):
@@ -61,10 +70,8 @@ def display(data):
             '.': 5,
             }
 
-    width = 20
-
     # Cover art
-    cover, dc = coverArtToText(BytesIO(response.content), density, width)
+    cover, dc = coverArtToText(BytesIO(response.content), density, cover_size)
     print(cover)
 
     # Get ready to print the other stuff
@@ -80,7 +87,7 @@ def display(data):
 
         return f'{"\x1b[1m" if bold else ""}\x1b[{"38" if fg else "48"};2;{r};{g};{b}m{s}\x1b[0m'
 
-    w = width * 2 + 1
+    w = cover_size * 2 + 1
 
     # Title
     printNext(color(data['title'], dc), w)
@@ -105,7 +112,7 @@ def display(data):
     md('Link', data['link'])
 
     # Fill the rest of the space with empty lines
-    for _ in range(width - md.count - 2):
+    for _ in range(cover_size - md.count - 2):
         printNext('', w)
 
 # Get the history of fetched songs
@@ -116,6 +123,8 @@ if args.history:
             display(each)
     except KeyboardInterrupt:
         print('\nExiting...')
+
+    print(f'\n{len(data)} songs. ({formatBytes(os.path.getsize(song.History().history_loc))})')
     exit()
 
 elif args.remove:
@@ -134,7 +143,7 @@ elif args.history_clear:
 
 # Get the data about a song via the microphone
 try:
-    data = asyncio.run(song.Data(20, 2).get())
+    data = asyncio.run(song.Data(args.total, args.duration, args.increase).get() if not args.infinite else song.Data(-1, args.duration, args.increase).get())
     display(data)
 except KeyboardInterrupt:
     print('\nExiting...')

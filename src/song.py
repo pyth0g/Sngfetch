@@ -1,13 +1,16 @@
 import requests
-from resources import sampleAudio, userError
+from resources import sampleAudio, userError, getIndex
 from shazamio import Shazam
 import os
 import base64
 
 class Data:
-    def __init__(self, timeout: int = 20, duration: int = 2):
-        self.threshold = timeout // duration
+    def __init__(self, timeout: int = 20, duration: int = 2, increase: int = 0):
+        self.isinfinite = timeout == -1
+        self.threshold = timeout // duration 
+        self.threshold += increase * self.threshold
         self.duration = duration
+        self.inc = increase
 
     async def get(self):
         r = {'matches': []}
@@ -15,15 +18,15 @@ class Data:
         itr = 0
         
         # Loop until a match is found
-        print(f'\x1b[2K({itr}/{self.threshold}) Listening...\x1b[1A\x1b[999999999D')
+        print(f'\x1b[2K({itr}{('/' + str(self.threshold)) if not self.isinfinite else ''}) Listening...\x1b[1A\x1b[999999999D')
         while not (r['matches']):
-            print(f'\x1b[2K({itr}/{self.threshold}) Listening...\x1b[1A\x1b[999999999D')
-            if (itr == self.threshold - 1):
+            print(f'\x1b[2K({itr}{('/' + str(self.threshold)) if not self.isinfinite else ''}) Listening...\x1b[1A\x1b[999999999D')
+            if (itr == self.threshold - 1) and (not self.isinfinite):
                 # Last try; with a longer duration
-                print(f'\x1b[2K({itr}/{self.threshold}) Last try...\x1b[1A\x1b[999999999D')
+                print(f'\x1b[2K({itr}{self.threshold}) Last try...\x1b[1A\x1b[999999999D')
                 self.duration += 3
 
-            elif (itr >= self.threshold - 4):
+            elif (itr >= self.threshold - 4) and (not self.isinfinite):
                 # Trying harder; with longer durations
                 print(f'\x1b[2K({itr}/{self.threshold}) Trying harder...\x1b[1A\x1b[999999999D')
                 self.duration += 1
@@ -38,7 +41,7 @@ class Data:
             r = result
             itr += 1
 
-            if (itr >= self.threshold):
+            if (itr >= self.threshold) and (not self.isinfinite):
                 userError(f"Sorry couldn't recognize this song after {self.threshold} attempts.\x1b[K")
 
         return self._parse(r['track'])
@@ -63,8 +66,8 @@ class Data:
             'duration': 'Unknown',
             'popularity': 'Unknown',
             'explicit': track_data['hub'].get('explicit') == "True",
-            'album': (track_data.get('sections', [{}])[0].get('metadata', [{}])[0].get('text', 'Unknown')),
-            'release_date': track_data['sections'][0]['metadata'][2].get('text', 'Unknown'),
+            'album': (getIndex(0, getIndex(0, track_data.get('sections'), {}).get('metadata'), {}).get('text', 'Unknown')),
+            'release_date': getIndex(2, getIndex(0, track_data['sections'], {}).get('metadata'), {}).get('text', 'Unknown'),
             'label': track_data['sections'][0]['metadata'][1].get('text', 'Unknown'),
             'link': track_data.get('url', 'Unknown'),
             'isrc': track_data.get('isrc', 'Unknown'),
