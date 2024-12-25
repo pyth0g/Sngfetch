@@ -11,7 +11,7 @@ from lyrics import Lyrics
 
 # Versioning
 # Major revision (new UI, lots of new features, conceptual change, etc.), Minor revision (maybe a change to a search box, 1 feature added, collection of bug fixes), Bug fix release
-VERSION = '2.3.0'
+VERSION = '2.3.1'
 
 parser = argparse.ArgumentParser(description='Sngfetch: get song details in the command line.')
 parser.add_argument('-v', '--version', action='version', version=f'%(prog)s v{VERSION}')

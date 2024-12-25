@@ -102,7 +102,7 @@ class Data:
             'explicit': track_data['hub'].get('explicit') == "True",
             'album': (getIndex(0, getIndex(0, track_data.get('sections'), {}).get('metadata'), {}).get('text', 'Unknown')),
             'release_date': getIndex(2, getIndex(0, track_data['sections'], {}).get('metadata'), {}).get('text', 'Unknown'),
-            'label': getIndex(1, getIndex(0, track_data['sections']).get('metadata')).get('text', 'Unknown'),
+            'label': getIndex(1, getIndex(0, track_data.get('sections', {})).get('metadata', {})).get('text', 'Unknown'),
             'link': track_data.get('url', 'Unknown'),
             'isrc': track_data.get('isrc', 'Unknown'),
             'genre': track_data['genres'].get('primary', 'Unknown'),
