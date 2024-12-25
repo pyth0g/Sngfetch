@@ -134,8 +134,9 @@ def finish():
     if LOG_PATH:
         with open(LOG_PATH, 'w') as f:
             f.write('\n'.join(LOG))
+        
+        if not DISABLE_STDOUT: print(f'Logs saved in {LOG_PATH}.')
+        debug(f'Logs saved in {LOG_PATH}.')
     
-    if not DISABLE_STDOUT: print(f'Logs saved in {LOG_PATH}.')
-    debug(f'Logs saved in {LOG_PATH}.')
 
     sys.exit()
