@@ -23,7 +23,7 @@ class Data:
             print(f'\x1b[2K({itr}{('/' + str(self.threshold)) if not self.isinfinite else ''}) Listening...\x1b[1A\x1b[999999999D')
             if (itr == self.threshold - 1) and (not self.isinfinite):
                 # Last try; with a longer duration
-                print(f'\x1b[2K({itr}{self.threshold}) Last try...\x1b[1A\x1b[999999999D')
+                print(f'\x1b[2K({itr}/{self.threshold}) Last try...\x1b[1A\x1b[999999999D')
                 self.duration += 3
 
             elif (itr >= self.threshold - 4) and (not self.isinfinite):
