@@ -66,10 +66,17 @@ If you wish to package the app yourself:
 
 ## 5. Examples
 
-![Single Result](https://github.com/pyth0g/Sngfetch/blob/main/examples/example_0.png)
-![Multiple Results](https://github.com/pyth0g/Sngfetch/blob/main/examples/example_1.png)
-![History](https://github.com/pyth0g/Sngfetch/blob/main/examples/example_2.png)
-[![Demo Video](https://github.com/pyth0g/Sngfetch/blob/main/examples/sngfetch-thumbnail.jpg)](https://raspi.kladnik.cc/sngfetch_example_video)
+### Result
+![Single Result](./examples/example_0.png)
+
+### Lyrics
+![Result with lyrics](./examples/example_1.png)
+
+### History
+![History](./examples/example_2.png)
+
+### Demo Video
+[![Demo Video](./examples/sngfetch-thumbnail.jpg)](https://raspi.kladnik.cc/sngfetch_example_video)
 
 ---
 
