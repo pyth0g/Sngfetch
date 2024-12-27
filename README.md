@@ -96,7 +96,7 @@ If you wish to package the app yourself:
 ![History](./examples/example_2.png)
 
 ### Demo Video
-[![Demo Video](./examples/sngfetch-thumbnail.jpg)](https://github.com/user-attachments/assets/c502f39e-44da-4ccb-84fa-c84136c46a79)
+[![Demo Video](./examples/sngfetch-thumbnail.jpg)](https://youtu.be/2EE6d8Sjp_g)
 
 ---
 
