@@ -60,8 +60,28 @@ If you wish to package the app yourself:
 ## 4. Usage
 
 - Run the file with the instructions from [Running](#3-getting-started).
-- To see more instructions run the program with the **-h** or **--help** flag
-
+- These are all the possible flags:
+```text
+  -h, --help            show this help message and exit
+  -v, --version         show program's version number and exit
+  -l, --lyrics          Display the lyrics of the song fetched.
+  -hi, --history        Show the history of fetched songs.
+  -hic, --history-clear
+                        Clear all the history of fetched songs.
+  -r, --remove REMOVE   Remove a song from the history by it's title.
+  -d, --duration DURATION
+                        The default duration of each audio sample to be taken in seconds.
+  -t, --total TOTAL     The total amount of time to listen for in seconds.
+  -inc, --increase INCREASE
+                        Increase the duration of each audio sample to be taken in seconds.
+  -i, --infinite        Keep trying until interrupted.
+  -s, --size SIZE       The size of the cover art.
+  --debug               Debug mode.
+  -ve, --verbosity VERBOSITY
+                        Set the verbosity level of debug (will only have affect if debug is on).
+  --disable-stdout      Disable stdout and remove it from log.
+  --log                 Log all the output in sngfetch_i.log in the current directory (recommended to use in conjunction with disable-stdout).
+```
 ---
 
 ## 5. Examples
@@ -76,7 +96,7 @@ If you wish to package the app yourself:
 ![History](./examples/example_2.png)
 
 ### Demo Video
-[![Demo Video](./examples/sngfetch-thumbnail.jpg)](https://raspi.kladnik.cc/sngfetch_example_video)
+[![Demo Video](./examples/sngfetch-thumbnail.jpg)](https://github.com/user-attachments/assets/c502f39e-44da-4ccb-84fa-c84136c46a79)
 
 ---
 
