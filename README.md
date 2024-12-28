@@ -19,7 +19,7 @@ Sngfetch utilizes three APIs:
     > Note: The reverse engineered shazam api is accessed trough [shazamio](https://github.com/shazamio/ShazamIO).
 2. **Deezer API**: To provide additional details about the song.
 3. **Genius API**: (Optional) To fetch song lyrics.  
-   > Note: To use the Genius API, you’ll need to [create a free account](https://docs.genius.com/) and register an application to get your client access token.
+   > Note: To use the Genius API, you'll need to [create a free account](https://docs.genius.com/) and register an application to get your client access token.
 
 ---
 
@@ -66,9 +66,16 @@ If you wish to package the app yourself:
   -v, --version         show program's version number and exit
   -l, --lyrics          Display the lyrics of the song fetched.
   -ls, --lyrics-setup   Setup the access token for the Genius API.
-  -hi, --history        Show the history of fetched songs.
+  -cd, --continuous-until-different [CONTINUOUS_UNTIL_DIFFERENT]
+                        Keep searching even after a song is found, you can specify the delay between searches after the flag, stop by keyboard interrupt.
+  -c, --continuous [CONTINUOUS]
+                        Keep searching even after a song is found, you can specify the delay between searches after the flag, stop by keyboard interrupt.
+  -hi, --history [HISTORY]
+                        Show the history of fetched songs or a specific song by title.
   -hic, --history-clear
                         Clear all the history of fetched songs.
+  -m, --minimalist [MINIMALIST]
+                        Display data in a more minimal style the amount of data can be controlled with an integer (0..2) after the flag.
   -r, --remove REMOVE   Remove a song from the history by it's title.
   -d, --duration DURATION
                         The default duration of each audio sample to be taken in seconds.
@@ -82,6 +89,7 @@ If you wish to package the app yourself:
                         Set the verbosity level of debug (will only have affect if debug is on).
   --disable-stdout      Disable stdout and remove it from log.
   --log                 Log all the output in sngfetch_i.log in the current directory (recommended to use in conjunction with disable-stdout).
+  --freeze FREEZE       Freeze basic song data to specified json file.
 ```
 ---
 
