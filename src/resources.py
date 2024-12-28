@@ -33,6 +33,46 @@ def getIndex(index: int, itr: Iterable, fallback: Any | None = None) -> Any:
     except IndexError:
         return fallback
 
+def stripNonAlphaNum(s: str) -> str:
+    n_s = ''
+    for i in s:
+        n_s += i if i.isalnum() else ''
+
+    return n_s
+
+def matching(s1: str, s2: str, split: str = ' ', diff: int = 2) -> bool:
+    s1 = stripNonAlphaNum(s1)
+    s2 = stripNonAlphaNum(s2)
+    debug(f'Checking for match between {s1=}, {s2=}')
+    if (s1 in s2) or (s2 in s1):
+        debug('Strings include each other.')
+        return True
+    
+    matches = 0
+    s1_split = s1.strip().split(split)
+    s2_split = s2.strip().split(split)
+    if len(s1_split) != len(s2_split):
+        debug("Length doesn't match")
+        return False
+    
+    for c in range(len(s1_split)):
+        i = s1_split[c]
+        j = s2_split[c]
+        debug(f'{i=}, {j=}', level=1)
+        debug(f'Char diff: {len(set(i).difference(set(j)))}', level=1)
+        debug(f'Len diff: {abs(len(i) - len(j))}')
+        if len(set(i).difference(set(j))) <= diff and abs(len(i) - len(j)) < diff:
+            debug('Match found.')
+            matches += 1
+    
+    if matches >= diff:
+        debug('Match found.')
+        return True
+    
+    debug('Not a match.')
+    return False
+
+
 def formatBytes(size: int) -> Tuple[int, str]:
     power = 2**10
     n = 0

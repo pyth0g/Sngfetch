@@ -8,17 +8,23 @@ import asyncio
 import argparse
 import os
 from lyrics import Lyrics
+from time import sleep
+import re
+import json
 
 # Versioning
 # Major revision (new UI, lots of new features, conceptual change, etc.), Minor revision (maybe a change to a search box, 1 feature added, collection of bug fixes), Bug fix release
-VERSION = '2.4.1'
+VERSION = '2.5.1'
 
 parser = argparse.ArgumentParser(description='Sngfetch: get song details in the command line.')
 parser.add_argument('-v', '--version', action='version', version=f'%(prog)s v{VERSION}')
 parser.add_argument('-l', '--lyrics', action='store_true', help='Display the lyrics of the song fetched.')
 parser.add_argument('-ls', '--lyrics-setup', action='store_true', help='Setup the access token for the Genius API.')
-parser.add_argument('-hi', '--history', action='store_true', help='Show the history of fetched songs.')
+parser.add_argument('-cd', '--continuous-until-different', type=int, nargs='?', help='Keep searching even after a song is found, you can specify the delay between searches after the flag, stop by keyboard interrupt.', const=0)
+parser.add_argument('-c', '--continuous', type=int, nargs='?', help='Keep searching even after a song is found, you can specify the delay between searches after the flag, stop by keyboard interrupt.', const=0)
+parser.add_argument('-hi', '--history', type=str, nargs='?', help='Show the history of fetched songs or a specific song by title.', const='')
 parser.add_argument('-hic', '--history-clear', action='store_true', help='Clear all the history of fetched songs.')
+parser.add_argument('-m', '--minimalist', type=int, nargs='?', help='Display data in a more minimal style the amount of data can be controlled with an integer (0..2) after the flag.', const=0, default=-1)
 parser.add_argument('-r', '--remove', help="Remove a song from the history by it's title.")
 parser.add_argument('-d', '--duration', type=int, help='The default duration of each audio sample to be taken in seconds.', default=3)
 parser.add_argument('-t', '--total', type=int, help='The total amount of time to listen for in seconds.', default=30)
@@ -29,6 +35,7 @@ parser.add_argument('--debug', action='store_true', help='Debug mode.')
 parser.add_argument('-ve', '--verbosity', type=int, help='Set the verbosity level of debug (will only have affect if debug is on).', default=0)
 parser.add_argument('--disable-stdout', action='store_true', help='Disable stdout and remove it from log.')
 parser.add_argument('--log', action='store_true', help='Log all the output in sngfetch_i.log in the current directory (recommended to use in conjunction with disable-stdout).')
+parser.add_argument('--freeze', type=str, help='Freeze basic song data to specified json file.')
 args = parser.parse_args()
 
 genius_api_path = os.path.join(os.path.expanduser('~'), 'genius.api')
@@ -44,6 +51,23 @@ else:
 debug(f'Initialized arguments.')
 debug(args, level=1)
 
+if args.freeze:
+    debug(f'Freezing to file {args.freeze}.')
+    tracks = song.History().get()
+    debug(f'Loaded {tracks=}', level=2)
+    data = {item['title']: {key: value for key, value in item.items() if key != 'title'} for item in tracks}
+    debug(f'Loaded {data=}', level=2)
+
+    with open(args.freeze, 'w') as f:
+        debug('Writing to file...')
+        json.dump(data, f, indent=4)
+
+    debug(f'Written to {args.freeze} successfully.')
+
+    finish()
+
+ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+
 if args.log:
     debug('Logging to file enabled.')
     i = 0
@@ -56,12 +80,18 @@ if args.log:
     resources.LOG_PATH = log
 
     def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
+        if args.minimalist == 2:
+            values = [ansi_escape.sub('', str(value)) for value in values]
+            
         print(*values, end=end, sep=sep, file=file, flush=flush)
         resources.LOG.append(sep.join(values))
 
 else:
     debug('Logging to file disabled.')
     def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
+        if args.minimalist == 2:
+            values = [ansi_escape.sub('', str(value)) for value in values]
+
         print(*values, end=end, sep=sep, file=file, flush=flush)
 
 if args.disable_stdout:
@@ -76,7 +106,7 @@ if args.lyrics_setup:
         os.remove(genius_api_path)
         Lyrics.ensureAPIcreds(genius_api_path)
 
-    print('Doing nothing.')
+    db_print('Doing nothing.')
     finish()
 
 def printNext(s: str, w: int, end: str = '\n') -> None:
@@ -108,54 +138,68 @@ def display(data):
     debug(f'Displaying data for {data["title"]} by {data["artists"]}.')
     debug(f'Getting cover art from {data["cover"]}.')
     debug(f'Using data: {data}', level=1)
-    response = requests.get(data['cover'])
-    debug(f'Got cover art from {data["cover"]}.')
+    response = None
+    w = 0
+    dc = (255, 255, 255)
+    if args.minimalist < 1:
+        if data['cover']:
+            response = requests.get(data['cover'])
+            debug(f'Got cover art from {data["cover"]}.')
+        
+        else:
+            debug('Unable to get cover art.', 'warning', '\x1b[31m')
     
-    density = {
-            'Ñ': 255,
-            '@': 245,
-            '#': 235,
-            'W': 225, 
-            '$': 215, 
-            '9': 205, 
-            '8': 195, 
-            '7': 185, 
-            '6': 175, 
-            '5': 165, 
-            '4': 155, 
-            '3': 145, 
-            '2': 135, 
-            '1': 125, 
-            '0': 115, 
-            '?': 105, 
-            '!': 95, 
-            'a': 85, 
-            'b': 75, 
-            'c': 65, 
-            ';': 55, 
-            ':': 50, 
-            '+': 45, 
-            '=': 40, 
-            '-': 35,
-            '*': 20,
-            ',': 10,
-            '.': 5,
-            }
+        density = {
+                'Ñ': 255,
+                '@': 245,
+                '#': 235,
+                'W': 225, 
+                '$': 215, 
+                '9': 205, 
+                '8': 195, 
+                '7': 185, 
+                '6': 175, 
+                '5': 165, 
+                '4': 155, 
+                '3': 145, 
+                '2': 135, 
+                '1': 125, 
+                '0': 115, 
+                '?': 105, 
+                '!': 95, 
+                'a': 85, 
+                'b': 75, 
+                'c': 65, 
+                ';': 55, 
+                ':': 50, 
+                '+': 45, 
+                '=': 40, 
+                '-': 35,
+                '*': 20,
+                ',': 10,
+                '.': 5,
+                }
 
-    # Cover art
-    debug('Converting cover art to text.')
-    cover, dc = resources.coverArtToText(BytesIO(response.content), density, cover_size)
-    debug('Converted cover art to text.')
-    db_print(cover)
+        # Cover art
+        cover, dc = '\n'*cover_size, (255, 255, 255)
+        if response:
+            debug('Converting cover art to text.')
+            cover, dc = resources.coverArtToText(BytesIO(response.content), density, cover_size)
+            debug('Converted cover art to text.')
+        
+    if args.minimalist < 0:
+        db_print(cover)
 
-    # Get ready to print the other stuff
-    # Put the cursor back up
-    db_print(f'\x1b[{len(cover.splitlines()) + 1}A')
+        # Get ready to print the other stuff
+        # Put the cursor back up
+        db_print(f'\x1b[{len(cover.splitlines()) + 1}A')
 
-
-    w = cover_size * 2 + 1
+        w = cover_size * 2 + 1
 
     # Title
+    if args.minimalist >= 0:
+        db_print('\x1b[2K\x1b[A')
+
     printNext(color(data['title'], dc), w)
     printNext('-' * len(data['title']), w)
 
@@ -167,7 +211,6 @@ def display(data):
     md('Album', data['album'])
     md('Label', data['label'])
     md('Genre', data['genre'])
-    # md('Composer', data['composer'])
     md('Duration', data['duration'])
     md('Popularity', f'#{int(data['popularity']):,}' if data['popularity'] else 'Unknown')
     md('Released', data['release_date'] if data['release_date'] else 'Unknown')
@@ -177,20 +220,38 @@ def display(data):
     md('Gain', data['gain'])
     md('Link', data['link'])
 
+    if args.minimalist < 0:
+        # Fill the rest of the space with empty lines
+        for _ in range(cover_size - md.count - 2):
+            printNext('', w)   
 
-    # Fill the rest of the space with empty lines
-    for _ in range(cover_size - md.count - 2):
-        printNext('', w)   
+        debug(f'Displayed {md.count} metadata lines and {cover_size - md.count - 2} empty lines.')
+    
+    else:
+        printNext('', w)
+        debug(f'Displayed {md.count} metadata lines.')
 
-    debug(f'Displayed {md.count} metadata lines and {cover_size - md.count - 2} empty lines.')
+    ## Lyrics
+    if args.lyrics:
+        # Get lyrics
+        try:
+            debug(f'Getting lyrics.')
+            lyrics = Lyrics.getFromTitle(f'{data["title"].split('(')[0].strip()} {''.join(data["artists"]).strip().split(',')[0]}', data["title"], genius_api_path)
+            if lyrics:
+                debug('Got lyrics successfully.')
+                db_print(lyrics[0])
+                db_print(f'({lyrics[1]})\n')
+        except KeyboardInterrupt:
+            debug('Keyboard interrupt.')
+            db_print('\nExiting...')
 
 def main():
     ## Show history
-    if args.history:
+    if args.history == '' or args.history:
         #  Get history of all fetched songs.
-        debug('Getting history of fetched songs.')
+        debug('Getting whole history of fetched songs.')
         try:
-            data = song.History().get()
+            data = song.History(args.history).get()
             for each in data:
                 display(each)
         except KeyboardInterrupt:
@@ -227,31 +288,52 @@ def main():
         debug('History cleared successfully.')
         finish()
 
+    if args.continuous == 0 or args.continuous:
+        debug('Searching continuously.')
+        while True:
+            try:
+                debug(f'Started fetching song data with args {(args.total, args.duration, args.increase) if not args.infinite else (-1, args.duration, args.increase)}.')
+                data = asyncio.run(song.Data(args.total, args.duration, args.increase, True).get() if not args.infinite else song.Data(-1, args.duration, args.increase).get())
+                if data:
+                    debug('Fetched song data successfully.')
+                    display(data)
+            except KeyboardInterrupt:
+                debug('Keyboard interrupt.')
+                db_print('\nExiting...')
+                finish()
+            
+            sleep(args.continuous)
+
+    elif args.continuous_until_different == 0 or args.continuous_until_different:
+        debug('Searching continuously and only showing different songs.')
+        last_data = None
+        while True:
+            try:
+                debug(f'Started fetching song data with args {(args.total, args.duration, args.increase) if not args.infinite else (-1, args.duration, args.increase)}.')
+                data = asyncio.run(song.Data(args.total, args.duration, args.increase, True).get() if not args.infinite else song.Data(-1, args.duration, args.increase).get())
+                if data and data != last_data:
+                    last_data = data
+                    debug('Fetched song data successfully.')
+                    display(data)
+            except KeyboardInterrupt:
+                debug('Keyboard interrupt.')
+                db_print('\nExiting...')
+                finish()
+            
+            sleep(args.continuous_until_different)
+
     ## Main
     # Get the data about a song via the microphone
     try:
         debug(f'Started fetching song data with args {(args.total, args.duration, args.increase) if not args.infinite else (-1, args.duration, args.increase)}.')
-        data = asyncio.run(song.Data(args.total, args.duration, args.increase).get() if not args.infinite else song.Data(-1, args.duration, args.increase).get())
+        data = asyncio.run(song.Data(args.total, args.duration, args.increase, False).get() if not args.infinite else song.Data(-1, args.duration, args.increase).get())
         debug('Fetched song data successfully.')
         display(data)
     except KeyboardInterrupt:
         debug('Keyboard interrupt.')
         db_print('\nExiting...')
-
-    ## Lyrics
-    if args.lyrics:
-        # Get lyrics
-        try:
-            debug(f'Getting lyrics.')
-            lyrics = Lyrics.getFromTitle(f'{data["title"].split('(')[0].strip()} {''.join(data["artists"]).strip()}', data["title"], genius_api_path)
-            debug('Got lyrics successfully.')
-            db_print(lyrics[0])
-            db_print(f'({lyrics[1]})')
-        except KeyboardInterrupt:
-            debug('Keyboard interrupt.')
-            db_print('\nExiting...')
         finish()
 
 if __name__ == '__main__':
     main()
-    finish() # Save logs if logging is on and exit
+    finish() # Ensure exit with saving logs

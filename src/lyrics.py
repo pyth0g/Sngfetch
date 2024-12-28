@@ -1,6 +1,6 @@
 import os
 import requests
-from resources import userError, debug, DISABLE_STDOUT, finish, LOG_PATH
+from resources import userError, debug, DISABLE_STDOUT, finish, LOG_PATH, stripNonAlphaNum
 import resources
 from sys import platform
 import subprocess
@@ -102,8 +102,14 @@ class Lyrics:
             unclosed_angle_bracket = False
             unclosed_bracket = False
             unclosed_bracket_string = ''
+            rm_next_line = False
             for line in unfiltered_lyrics:
                 line = line.strip()
+
+                if rm_next_line:
+                    rm_next_line = False
+                    debug(f'Got instruction to skip this line: {line}')
+                    continue
 
                 if unclosed_angle_bracket:
                     debug(f'Unclosed angle bracket on line: {line}')
@@ -158,6 +164,11 @@ class Lyrics:
                     debug(f'Skipping line: {line}')
                     continue
 
+                if line.startswith('See') and line.endswith('Live'):
+                    debug(f'Promo line removed it: {line}')
+                    rm_next_line = True
+                    continue
+
                 lyrics.append(line)
                 debug(f'Added line to lyrics: {line}.')
             
@@ -204,9 +215,14 @@ class Lyrics:
                 debug(f'{song_url=}', level=2)
                 song_title = search_results[i].get('result', {}).get('title', '')
                 debug(f'{song_title=}', level=2)
-                if song_url and title.lower() in song_title.lower():
+                debug(f'{title=}', level=2)
+                clear_title = stripNonAlphaNum(title.lower())
+                clear_song_title = stripNonAlphaNum(song_title.lower())
+                debug(f'{clear_song_title=}', level=2)
+                debug(f'{clear_title=}', level=2)
+                if song_url and (clear_title in clear_song_title) or (clear_song_title in clear_title):
                     debug(f'Found song url, getting lyrics from url.')
                     return Lyrics.getFromUrl(song_url), song_url
                 i += 1
         
-        userError(f"Unable to fetch lyrics for '{title}'.")
+        db_print(f"Unable to fetch lyrics for '{title}'.")
