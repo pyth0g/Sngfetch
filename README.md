@@ -19,7 +19,7 @@ Sngfetch utilizes three APIs:
     > Note: The reverse engineered shazam api is accessed trough [shazamio](https://github.com/shazamio/ShazamIO).
 2. **Deezer API**: To provide additional details about the song.
 3. **Genius API**: (Optional) To fetch song lyrics.  
-   > Note: To use the Genius API, you’ll need to [create a free account](https://docs.genius.com/) and register an application.
+   > Note: To use the Genius API, you’ll need to [create a free account](https://docs.genius.com/) and register an application to get your client access token.
 
 ---
 
@@ -65,6 +65,7 @@ If you wish to package the app yourself:
   -h, --help            show this help message and exit
   -v, --version         show program's version number and exit
   -l, --lyrics          Display the lyrics of the song fetched.
+  -ls, --lyrics-setup   Setup the access token for the Genius API.
   -hi, --history        Show the history of fetched songs.
   -hic, --history-clear
                         Clear all the history of fetched songs.
@@ -83,6 +84,14 @@ If you wish to package the app yourself:
   --log                 Log all the output in sngfetch_i.log in the current directory (recommended to use in conjunction with disable-stdout).
 ```
 ---
+
+### Setting up lyrics
+To setup lyrics fetching you will need to:
+- Visit <https://genius.com/api-clients> and sign up for an account.
+- Click on **New API Client**, fill out the form (you can put in any data) and click save.
+- Click on **Generate Access Token** (bellow Client Secret) and copy the token.
+- Run the program with the ```-ls``` or ```--lyrics-setup``` flag, it will create the file where you can store the token.
+- The program will prompt you to open the file, confirm and paste the token in after ```Access-Token:```
 
 ## 5. Examples
 

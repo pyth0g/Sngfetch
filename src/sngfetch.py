@@ -11,11 +11,12 @@ from lyrics import Lyrics
 
 # Versioning
 # Major revision (new UI, lots of new features, conceptual change, etc.), Minor revision (maybe a change to a search box, 1 feature added, collection of bug fixes), Bug fix release
-VERSION = '2.3.1'
+VERSION = '2.4.1'
 
 parser = argparse.ArgumentParser(description='Sngfetch: get song details in the command line.')
 parser.add_argument('-v', '--version', action='version', version=f'%(prog)s v{VERSION}')
 parser.add_argument('-l', '--lyrics', action='store_true', help='Display the lyrics of the song fetched.')
+parser.add_argument('-ls', '--lyrics-setup', action='store_true', help='Setup the access token for the Genius API.')
 parser.add_argument('-hi', '--history', action='store_true', help='Show the history of fetched songs.')
 parser.add_argument('-hic', '--history-clear', action='store_true', help='Clear all the history of fetched songs.')
 parser.add_argument('-r', '--remove', help="Remove a song from the history by it's title.")
@@ -29,6 +30,8 @@ parser.add_argument('-ve', '--verbosity', type=int, help='Set the verbosity leve
 parser.add_argument('--disable-stdout', action='store_true', help='Disable stdout and remove it from log.')
 parser.add_argument('--log', action='store_true', help='Log all the output in sngfetch_i.log in the current directory (recommended to use in conjunction with disable-stdout).')
 args = parser.parse_args()
+
+genius_api_path = os.path.join(os.path.expanduser('~'), 'genius.api')
 
 if args.debug:
     resources.DEBUG = True
@@ -66,6 +69,15 @@ if args.disable_stdout:
     resources.DISABLE_STDOUT = True
     def db_print(*values, sep = None, end = None, file = None, flush = False): ... # Disable print
 
+if args.lyrics_setup:
+    debug('Lyrics setup.')
+    Lyrics.ensureAPIcreds(genius_api_path)
+    if input('API credentials already exist, remove them [y/N]: ') == 'y':
+        os.remove(genius_api_path)
+        Lyrics.ensureAPIcreds(genius_api_path)
+
+    print('Doing nothing.')
+    finish()
 
 def printNext(s: str, w: int, end: str = '\n') -> None:
     # Go as far to the left as possible then go to the right for the correct amount
@@ -172,64 +184,74 @@ def display(data):
 
     debug(f'Displayed {md.count} metadata lines and {cover_size - md.count - 2} empty lines.')
 
-# Get the history of fetched songs
-if args.history:
-    debug('Getting history of fetched songs.')
+def main():
+    ## Show history
+    if args.history:
+        #  Get history of all fetched songs.
+        debug('Getting history of fetched songs.')
+        try:
+            data = song.History().get()
+            for each in data:
+                display(each)
+        except KeyboardInterrupt:
+            debug('Keyboard interrupt.')
+            db_print('\nExiting...')
+
+        db_print(f'\n{len(data)} songs. ({resources.formatBytes(os.path.getsize(song.History().history_loc))})')
+        debug('Displayed history successfully.')
+        finish()
+
+    ## Remove song
+    if args.remove:
+        # Remove a song from history by title
+        try:
+            debug(f'Removing song with title {args.remove}.')
+            song.History().remove(args.remove)
+        except KeyboardInterrupt:
+            debug('Keyboard interrupt.')
+            db_print('\nExiting...')
+        
+        debug('Song removal ran successfully.')
+        finish()
+
+    ## History clear
+    if args.history_clear:
+        # Clear history
+        try:
+            debug('Clearing history of fetched songs.')
+            song.History().clear()
+        except KeyboardInterrupt:
+            debug('Keyboard interrupt.')
+            db_print('\nExiting...')
+        
+        debug('History cleared successfully.')
+        finish()
+
+    ## Main
+    # Get the data about a song via the microphone
     try:
-        data = song.History().get()
-        for each in data:
-            display(each)
+        debug(f'Started fetching song data with args {(args.total, args.duration, args.increase) if not args.infinite else (-1, args.duration, args.increase)}.')
+        data = asyncio.run(song.Data(args.total, args.duration, args.increase).get() if not args.infinite else song.Data(-1, args.duration, args.increase).get())
+        debug('Fetched song data successfully.')
+        display(data)
     except KeyboardInterrupt:
         debug('Keyboard interrupt.')
         db_print('\nExiting...')
 
-    db_print(f'\n{len(data)} songs. ({resources.formatBytes(os.path.getsize(song.History().history_loc))})')
-    debug('Displayed history successfully.')
-    finish()
+    ## Lyrics
+    if args.lyrics:
+        # Get lyrics
+        try:
+            debug(f'Getting lyrics.')
+            lyrics = Lyrics.getFromTitle(f'{data["title"].split('(')[0].strip()} {''.join(data["artists"]).strip()}', data["title"], genius_api_path)
+            debug('Got lyrics successfully.')
+            db_print(lyrics[0])
+            db_print(f'({lyrics[1]})')
+        except KeyboardInterrupt:
+            debug('Keyboard interrupt.')
+            db_print('\nExiting...')
+        finish()
 
-if args.remove:
-    try:
-        debug(f'Removing song with title {args.remove}.')
-        song.History().remove(args.remove)
-    except KeyboardInterrupt:
-        debug('Keyboard interrupt.')
-        db_print('\nExiting...')
-    
-    debug('Song removal ran successfully.')
-    finish()
-
-if args.history_clear:
-    try:
-        debug('Clearing history of fetched songs.')
-        song.History().clear()
-    except KeyboardInterrupt:
-        debug('Keyboard interrupt.')
-        db_print('\nExiting...')
-    
-    debug('History cleared successfully.')
-    finish()
-
-# Get the data about a song via the microphone
-try:
-    debug(f'Started fetching song data with args {(args.total, args.duration, args.increase) if not args.infinite else (-1, args.duration, args.increase)}.')
-    data = asyncio.run(song.Data(args.total, args.duration, args.increase).get() if not args.infinite else song.Data(-1, args.duration, args.increase).get())
-    debug('Fetched song data successfully.')
-    display(data)
-except KeyboardInterrupt:
-    debug('Keyboard interrupt.')
-    db_print('\nExiting...')
-
-if args.lyrics:
-    try:
-        debug('Getting lyrics.')
-        lyrics = Lyrics.getFromTitle(f'{data["title"]} {''.join(data["artists"])}', data["title"])
-        debug('Got lyrics successfully.')
-        db_print(lyrics[0])
-        db_print(f'({lyrics[1]})')
-    except KeyboardInterrupt:
-        debug('Keyboard interrupt.')
-        db_print('\nExiting...')
-    finish()
-
-# Save logs if logging is on an exit
-finish()
+if __name__ == '__main__':
+    main()
+    finish() # Save logs if logging is on and exit

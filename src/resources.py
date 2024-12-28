@@ -112,15 +112,11 @@ def coverArtToText(image: str, density: dict, s: int) -> Tuple[str, tuple]:
     
     for y in range(im.height):
         for x in range(im.width):
-            debug(f'Pixel ({x}, {y}).', level=2)
             mono_pixel = mono.getpixel((x, y))
-            debug(f'Got monochrome pixel value: {mono_pixel}.', level=2)
             r, g, b = im.getpixel((x, y))
-            debug(f'Got RGB pixel value: ({r}, {g}, {b}).', level=2)
             
             res_key, _ = min(density.items(), key=lambda i: abs(mono_pixel - i[1]))
             tmp += f"\x1b[1m\x1b[38;2;{r};{g};{b}m{res_key}\x1b[0m"
-            debug(f'Converted pixel ({x}, {y}) to ascii.', level=2)
         
         img.append(tmp)
         debug(f'Converted row {y + 1} to ascii.', level=1)
