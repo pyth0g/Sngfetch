@@ -1,7 +1,7 @@
 import song
 from io import BytesIO
 import resources
-from resources import debug, finish
+from resources import debug, finish, db_print
 import requests
 from typing import Callable
 import asyncio
@@ -9,12 +9,11 @@ import argparse
 import os
 from lyrics import Lyrics
 from time import sleep
-import re
 import json
 
 # Versioning
 # Major revision (new UI, lots of new features, conceptual change, etc.), Minor revision (maybe a change to a search box, 1 feature added, collection of bug fixes), Bug fix release
-VERSION = '2.5.1'
+VERSION = '2.5.2'
 
 parser = argparse.ArgumentParser(description='Sngfetch: get song details in the command line.')
 parser.add_argument('-v', '--version', action='version', version=f'%(prog)s v{VERSION}')
@@ -48,6 +47,8 @@ else:
     resources.DEBUG = False # Ensure that the debug mode is off (although it should be off already).
     resources.DEBUG_LEVEL = 0
 
+resources.MINIMALIST_LEVEL = args.minimalist
+
 debug(f'Initialized arguments.')
 debug(args, level=1)
 
@@ -66,8 +67,6 @@ if args.freeze:
 
     finish()
 
-ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
-
 if args.log:
     debug('Logging to file enabled.')
     i = 0
@@ -78,27 +77,13 @@ if args.log:
     log = os.path.join(os.getcwd(), f'sngfetch_{i}.log')
     debug(f'Found debug log file path: {log}.')
     resources.LOG_PATH = log
-
-    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
-        if args.minimalist == 2:
-            values = [ansi_escape.sub('', str(value)) for value in values]
-            
-        print(*values, end=end, sep=sep, file=file, flush=flush)
-        resources.LOG.append(sep.join(values))
-
 else:
     debug('Logging to file disabled.')
-    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
-        if args.minimalist == 2:
-            values = [ansi_escape.sub('', str(value)) for value in values]
-
-        print(*values, end=end, sep=sep, file=file, flush=flush)
 
 if args.disable_stdout:
     debug('Disabled print.')
     resources.DISABLE_STDOUT = True
-    def db_print(*values, sep = None, end = None, file = None, flush = False): ... # Disable print
-
+    
 if args.lyrics_setup:
     debug('Lyrics setup.')
     Lyrics.ensureAPIcreds(genius_api_path)
@@ -111,7 +96,7 @@ if args.lyrics_setup:
 
 def printNext(s: str, w: int, end: str = '\n') -> None:
     # Go as far to the left as possible then go to the right for the correct amount
-    db_print(f'\x1b[99999999D\x1b[{w}C{s}', end=end)
+    db_print(f'\x1b[99999999D\x1b[{w}C{s}', end=end, no_clear=True)
 
 def color(s: str, rgb: tuple, bold: bool = True, fg: bool = True) -> str:
     r, g, b = rgb

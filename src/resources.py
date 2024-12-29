@@ -7,6 +7,7 @@ from PIL import Image
 from typing import Tuple, Any, Iterable
 from datetime import datetime as dt
 import inspect
+import re
 
 class userError:
     def __init__(self, err_msg: str):
@@ -19,6 +20,7 @@ DEBUG_LEVEL = 0
 DISABLE_STDOUT = False
 LOG = []
 LOG_PATH = ''
+MINIMALIST_LEVEL = -1
 
 def debug(value: object, status: str | None = 'info', color: str = '', level: int = 0) -> None:
     if DEBUG and level <= DEBUG_LEVEL:
@@ -26,6 +28,22 @@ def debug(value: object, status: str | None = 'info', color: str = '', level: in
         debug_msg = f'[{dt.now().strftime("%H:%M:%S")}] [{status.upper()}] [{stack[1].filename.split('/')[-1].split('\\')[-1]} -> {stack[1].function}] {value}'
         print(color + debug_msg + '\x1b[0m')
         LOG.append(debug_msg)
+
+ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+
+def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False, no_clear: bool = False):
+    if not DISABLE_STDOUT:
+        if not no_clear:
+            print("\r\x1b[0K", end="", flush=flush) # Add \x1b[0K to start of values to clear any weird artifacts in front of the string
+        
+        if MINIMALIST_LEVEL == 2:
+            values = [ansi_escape.sub('', str(value)) for value in values]
+        
+        print(*values, end=end, sep=sep, file=file, flush=flush)
+        
+        if LOG_PATH:
+            LOG.append(sep.join(values))
+
 
 def getIndex(index: int, itr: Iterable, fallback: Any | None = None) -> Any:
     try:

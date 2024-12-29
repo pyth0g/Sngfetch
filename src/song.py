@@ -1,24 +1,8 @@
 import requests
-from resources import sampleAudio, userError, getIndex, debug, DISABLE_STDOUT, LOG_PATH, finish, matching
-import resources
+from resources import sampleAudio, userError, getIndex, debug, db_print, finish, matching
 from shazamio import Shazam
 import os
 import base64
-
-if LOG_PATH:
-    debug('Logging to file enabled.')
-    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
-        print(*values, end=end, sep=sep, file=file, flush=flush)
-        resources.LOG.append(sep.join(values))
-
-else:
-    debug('Logging to file disabled.')
-    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
-        print(*values, end=end, sep=sep, file=file, flush=flush)
-
-if DISABLE_STDOUT:
-    debug('Disabled print.')
-    def db_print(*values, sep = None, end = None, file = None, flush = False): ... # Disable print
 
 class Data:
     def __init__(self, timeout: int = 20, duration: int = 2, increase: int = 0, inf: bool = False):
@@ -67,7 +51,13 @@ class Data:
             shazam = Shazam()
             debug(f'Initialized Shazam.')
             debug(f'Recognizing audio sample.')
-            result = await shazam.recognize(audio_bin)
+            try:
+                result = await shazam.recognize(audio_bin)
+            except Exception as e:
+                debug(f'Shazam API error: {e}', 'error', '\x1b[31m')
+                if not self.inf:
+                    userError(f'Sorry the program has encountered an error with the Shazam API.')
+                return None
             debug(f'Got result.')
 
             r = result
@@ -76,7 +66,8 @@ class Data:
 
             if (itr >= self.threshold) and (not self.isinfinite):
                 debug(f'Exceeded threshold of {self.threshold} attempts.')
-                if not self.inf: userError(f"Sorry couldn't recognize this song after {self.threshold} attempts.\x1b[K")
+                if not self.inf: 
+                    userError(f"Sorry couldn't recognize this song after {self.threshold} attempts.\x1b[K")
                 return None
 
         debug(f'Got a match after {itr} iterations.')
