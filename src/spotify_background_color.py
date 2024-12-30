@@ -1,11 +1,12 @@
 import numpy as np
-import scipy.misc as sp
+import scipy.misc as sp # Don't remove
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from PIL import Image
 
 """
-Code by: https://github.com/davidkrantz
+The author of this library is: https://github.com/davidkrantz
+You can find it here: https://github.com/davidkrantz/Colorfy
 """
 
 

@@ -1,28 +1,11 @@
 import os
 import requests
-from resources import userError, debug, DISABLE_STDOUT, finish, LOG_PATH, stripNonAlphaNum
-import resources
+from resources import userError, debug, db_print, finish, stripNonAlphaNum, matching
 from sys import platform
 import subprocess
-import base64
 import urllib.parse
 import bs4
 import re
-
-if LOG_PATH:
-    debug('Logging to file enabled.')
-    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
-        print(*values, end=end, sep=sep, file=file, flush=flush)
-        resources.LOG.append(sep.join(values))
-
-else:
-    debug('Logging to file disabled.')
-    def db_print(*values: object, sep: str | None = " ", end: str | None = "\n", file: str | None = None, flush: bool = False):
-        print(*values, end=end, sep=sep, file=file, flush=flush)
-
-if DISABLE_STDOUT:
-    debug('Disabled print.')
-    def db_print(*values, sep = None, end = None, file = None, flush = False): ... # Disable print
 
 class Lyrics:
     def ensureAPIcreds(file_path: str):
@@ -41,6 +24,8 @@ class Lyrics:
                     debug(f'Found access token.')
 
         if not access_token:
+            # The file exists but doesn't have a token inside;
+            # ask the user to open the file.
             debug(f'Missing Genius API access token in the file {file_path}.')
             if input(f"Missing Genius API access token in the file '{file_path}'. Open the file [y/N]? ").lower() == 'y':
                 try:
@@ -70,30 +55,44 @@ class Lyrics:
         return result
 
     def getFromUrl(song_url: str):
+        """
+        Get song lyrics from a genius search url
+        """
+
         debug(f'Fetching lyrics from url: {song_url}.')
         response = requests.get(song_url)
         debug(f'Got response from url: {song_url}.')
         html = response.text
         soup = bs4.BeautifulSoup(html, 'html.parser')
 
+        # All the divs that start with Lyrics-sc
+        # which includes among other things the lyrics
+        # for a song
         divs = soup.find_all('div', class_=re.compile('^Lyrics-sc'))
         debug(f'{divs=}', level=2)
         for div in divs:
             debug(f'Finding lyrics in div.')
             debug(f'{div=}', level=2)
+            # unfiltered_lyrics are lyrics + some promo and junk text
             unfiltered_lyrics = div.get_text(separator='\n', strip=True).splitlines()
             debug(f'Found lyrics in div.')
             debug(f'{unfiltered_lyrics=}', level=2)
             for c, line in enumerate(unfiltered_lyrics):
+                # First go trough the whole lyrics to determine if it should be 
+                # split by <br/> tags or song sections
                 if line == '[Intro]' or 'Lyrics' in line:
                     if '[' not in '\n'.join(unfiltered_lyrics[c:]):
-                        debug("The lyrics don't have any [section] indicators, splitting by <br> tags (less effective).")
+                        # If the song doesn't have song sections it has to
+                        # be split on double <br/> tags since they (usually)
+                        # separate verses
+                        debug("The lyrics don't have any song sections, splitting by <br> tags (less effective).")
                         div = str(div).replace('<br/><br/>', '\n\n')
                         div = bs4.BeautifulSoup(div, 'html.parser')
                         unfiltered_lyrics = div.get_text(separator='\n', strip=True).splitlines()
                     else:
-                        debug("Splitting lyrics by [sections].")
-                        
+                        debug("Splitting lyrics by song sections.")
+                        # The splitting happens later
+    
             debug(f'{unfiltered_lyrics=}', level=2)
             lyrics = []
 
@@ -112,6 +111,7 @@ class Lyrics:
                     continue
 
                 if unclosed_angle_bracket:
+                    # Used for multiline song sections
                     debug(f'Unclosed angle bracket on line: {line}')
                     if ']' in line:
                         debug('Angle bracket closed.')
@@ -120,6 +120,7 @@ class Lyrics:
                     continue
 
                 if unclosed_bracket:
+                    # Sometimes you get reverb in multiple lines (on some very specific songs)
                     debug(f'Unclosed bracket on line: {line}')
                     unclosed_bracket_string += line
 
@@ -130,7 +131,10 @@ class Lyrics:
                         unclosed_bracket_string = ''
 
                     continue
-
+                
+                # Check if the song has started by seeing if the line says [Intro]
+                # or if the song doesn't have song sections check for Lyrics since
+                # it says Lyrics for TITLE at the start of almost every song
                 if line == '[Intro]' or 'Lyrics' in line:
                     debug(f'Found line after which song starts.')
                     debug(f'{line}', level=1)
@@ -164,37 +168,41 @@ class Lyrics:
                     debug(f'Skipping line: {line}')
                     continue
 
-                if line.startswith('See') and line.endswith('Live'):
-                    debug(f'Promo line removed it: {line}')
-                    rm_next_line = True
+                elif line.startswith('See') and line.endswith('Live'):
+                    debug(f'Promo line removed: {line}')
+                    rm_next_line = True # The next line is the ticket price
                     continue
 
                 lyrics.append(line)
                 debug(f'Added line to lyrics: {line}.')
             
-            if '\n'.join(lyrics[1:]).strip():
+            if '\n'.join(Lyrics.truncate(lyrics[1:-1])).strip():
                 debug(f'Lyrics found.')
                 break
         
-        debug(f'Lyrics: {lyrics[1:-1]}.', level=2)
+        debug(f'Lyrics: {Lyrics.truncate(lyrics[1:-1])}.', level=2)
         return '\n'.join(Lyrics.truncate(lyrics[1:-1])).strip()
     
     def getFromTitle(search_string: str, title:str, file_path: str):
+        """
+        Get lyrics from title (this method is the one used to find lyrics in the main program) by
+        getting the url and running it trough getFromUrl
+        """
+
         db_print('Fetching lyrics...\x1b[1A')
         debug(f'Fetching lyrics for {title=} with {search_string=}.')
         
-        # Define the file path for the access token
         debug(f'Checking for Genius API credentials in file: {file_path}.')
 
         access_token = Lyrics.ensureAPIcreds(file_path)
 
-        # Make the search request to the Genius API
         search_url = f'https://api.genius.com/search?q={urllib.parse.quote(search_string)}'
         debug(f'{search_url=}', level=2)
 
         search_headers = {
             'Authorization': f'Bearer {access_token}',
         }
+
         debug(f'{search_headers=}', level=2)
 
         debug(f'Sending GET request to {search_url} with headers.')
@@ -202,27 +210,30 @@ class Lyrics:
         debug('Got response.')
         debug(f'{response=}', level=2)
         song_url = None
-        i = 0
 
         debug(f'Status code: {response.status_code}', level=2)
         if response.status_code == 200:
-            search_results = response.json().get('response', {}).get('hits', [])
+            search_results = response.json().get('response', {}).get('hits', []) # hits is an iterable containing among other things result
+            
             debug(f'Got search results.')
             debug(f'{search_results=}', level=2)
-            while not song_url and i < len(search_results):
-                debug(f'Checking search result {i}.')
-                song_url = search_results[i].get('result', {}).get('url', '')
+
+            for c, result in enumerate(search_results): 
+                debug(f'Checking search result number {c}.')
+                
+                song_url = result.get('result', {}).get('url', '')
                 debug(f'{song_url=}', level=2)
-                song_title = search_results[i].get('result', {}).get('title', '')
+                
+                song_title = result.get('result', {}).get('title', '')
                 debug(f'{song_title=}', level=2)
                 debug(f'{title=}', level=2)
-                clear_title = stripNonAlphaNum(title.lower())
-                clear_song_title = stripNonAlphaNum(song_title.lower())
-                debug(f'{clear_song_title=}', level=2)
-                debug(f'{clear_title=}', level=2)
-                if song_url and (clear_title in clear_song_title) or (clear_song_title in clear_title):
+                
+                # Use matching since it is quite tolerant to slightly different strings,
+                # to prevent things like two slightly different apostrophes messing
+                # up the result (yes this was an actual problem I had on a song)
+                if song_url and matching(song_title, title):
                     debug(f'Found song url, getting lyrics from url.')
                     return Lyrics.getFromUrl(song_url), song_url
-                i += 1
         
+        # The program would have already exited if the lyrics had been found
         db_print(f"Unable to fetch lyrics for '{title}'.")
